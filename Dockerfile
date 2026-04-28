@@ -1,6 +1,5 @@
 # Use older Python base image with vulnerabilities
-# FROM python:3.8.10-slim
-FROM python:3.11-slim
+FROM python:3.8.10-slim
 
 LABEL maintainer="SCA Lab"
 LABEL version="1.0"
