@@ -110,75 +110,93 @@ else:
             }
         }
         
-        stage('Trivy Security Scan') {
-            steps {
-                script {
-                    echo 'Running comprehensive Trivy security scan...'
-                    
-                    sh '''
-                        # Create reports directory
-                        mkdir -p trivy-reports
-                        
-                        # Run comprehensive Trivy scan
-                        docker run --rm \
-                            -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v ${WORKSPACE}/trivy-reports:/reports \
-                            aquasec/trivy:${TRIVY_VERSION} image \
-                            --format table \
-                            --output /reports/trivy-detailed-report.txt \
-                            ${DOCKER_IMAGE}
-                        
-                        # Generate JSON report for parsing
-                        docker run --rm \
-                            -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v ${WORKSPACE}/trivy-reports:/reports \
-                            aquasec/trivy:${TRIVY_VERSION} image \
-                            --format json \
-                            --output /reports/trivy-report.json \
-                            ${DOCKER_IMAGE}
-                        
-                        # Generate severity-specific reports
-                        docker run --rm \
-                            -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v ${WORKSPACE}/trivy-reports:/reports \
-                            aquasec/trivy:${TRIVY_VERSION} image \
-                            --severity CRITICAL,HIGH \
-                            --format table \
-                            --output /reports/trivy-critical-high.txt \
-                            ${DOCKER_IMAGE}
-                        
-                        # Create a summary report
-                        echo "=== VULNERABILITY SUMMARY ===" > trivy-reports/trivy-summary.txt
-                        echo "Scan Date: $(date)" >> trivy-reports/trivy-summary.txt
-                        echo "Image: ${DOCKER_IMAGE}" >> trivy-reports/trivy-summary.txt
-                        echo "Git Commit: ${GIT_COMMIT}" >> trivy-reports/trivy-summary.txt
-                        echo "Git Branch: ${GIT_BRANCH}" >> trivy-reports/trivy-summary.txt
-                        echo "" >> trivy-reports/trivy-summary.txt
-                        
-                        # Count vulnerabilities by severity
-                        if [ -f trivy-reports/trivy-report.json ]; then
-                            echo "Parsing vulnerability counts..." >> trivy-reports/trivy-summary.txt
-                            
-                            # Count vulnerabilities by severity
-                            CRITICAL_COUNT=$(grep -o '"Severity":"CRITICAL"' trivy-reports/trivy-report.json | wc -l || echo "0")
-                            HIGH_COUNT=$(grep -o '"Severity":"HIGH"' trivy-reports/trivy-report.json | wc -l || echo "0")
-                            MEDIUM_COUNT=$(grep -o '"Severity":"MEDIUM"' trivy-reports/trivy-report.json | wc -l || echo "0")
-                            LOW_COUNT=$(grep -o '"Severity":"LOW"' trivy-reports/trivy-report.json | wc -l || echo "0")
-                            
-                            echo "CRITICAL: $CRITICAL_COUNT" >> trivy-reports/trivy-summary.txt
-                            echo "HIGH: $HIGH_COUNT" >> trivy-reports/trivy-summary.txt
-                            echo "MEDIUM: $MEDIUM_COUNT" >> trivy-reports/trivy-summary.txt
-                            echo "LOW: $LOW_COUNT" >> trivy-reports/trivy-summary.txt
-                            
-                            # Store counts for threshold checking
-                            echo $CRITICAL_COUNT > trivy-reports/critical-count.txt
-                            echo $HIGH_COUNT > trivy-reports/high-count.txt
-                            echo $MEDIUM_COUNT > trivy-reports/medium-count.txt
-                        fi
-                    '''
+            stage('Trivy Security Scan') {
+                steps {
+                    script {
+                        echo 'Running comprehensive Trivy security scan...'
+
+                        sh '''
+                            # Create reports directory
+                            mkdir -p trivy-reports
+
+                            # Run comprehensive Trivy scan
+                            docker run --rm \
+                                -v /var/run/docker.sock:/var/run/docker.sock \
+                                -v ${WORKSPACE}/trivy-reports:/reports \
+                                aquasec/trivy:${TRIVY_VERSION} image \
+                                --format table \
+                                --output /reports/trivy-detailed-report.txt \
+                                ${DOCKER_IMAGE}
+
+                            # Generate JSON report for parsing
+                            docker run --rm \
+                                -v /var/run/docker.sock:/var/run/docker.sock \
+                                -v ${WORKSPACE}/trivy-reports:/reports \
+                                aquasec/trivy:${TRIVY_VERSION} image \
+                                --format json \
+                                --output /reports/trivy-report.json \
+                                ${DOCKER_IMAGE}
+
+                            # Generate severity-specific reports
+                            docker run --rm \
+                                -v /var/run/docker.sock:/var/run/docker.sock \
+                                -v ${WORKSPACE}/trivy-reports:/reports \
+                                aquasec/trivy:${TRIVY_VERSION} image \
+                                --severity CRITICAL,HIGH \
+                                --format table \
+                                --output /reports/trivy-critical-high.txt \
+                                ${DOCKER_IMAGE}
+
+                            # Create a summary report
+                            echo "=== VULNERABILITY SUMMARY ===" > trivy-reports/trivy-summary.txt
+                            echo "Scan Date: $(date)" >> trivy-reports/trivy-summary.txt
+                            echo "Image: ${DOCKER_IMAGE}" >> trivy-reports/trivy-summary.txt
+                            echo "Git Commit: ${GIT_COMMIT}" >> trivy-reports/trivy-summary.txt
+                            echo "Git Branch: ${GIT_BRANCH}" >> trivy-reports/trivy-summary.txt
+                            echo "" >> trivy-reports/trivy-summary.txt
+
+                            # Parse Trivy JSON properly instead of grepping raw text
+                            if [ -f trivy-reports/trivy-report.json ]; then
+                                echo "Parsing vulnerability counts..." >> trivy-reports/trivy-summary.txt
+
+                                python3 - <<'PY'
+            import json
+            from pathlib import Path
+
+            report_path = Path("trivy-reports/trivy-report.json")
+            data = json.loads(report_path.read_text())
+
+            counts = {
+                "CRITICAL": 0,
+                "HIGH": 0,
+                "MEDIUM": 0,
+                "LOW": 0,
+            }
+
+            for result in data.get("Results", []):
+                for vuln in result.get("Vulnerabilities") or []:
+                    severity = vuln.get("Severity")
+                    if severity in counts:
+                        counts[severity] += 1
+
+            summary_path = Path("trivy-reports/trivy-summary.txt")
+            summary_path.write_text(
+                summary_path.read_text()
+                + f"CRITICAL: {counts['CRITICAL']}\\n"
+                + f"HIGH: {counts['HIGH']}\\n"
+                + f"MEDIUM: {counts['MEDIUM']}\\n"
+                + f"LOW: {counts['LOW']}\\n"
+            )
+
+            Path("trivy-reports/critical-count.txt").write_text(str(counts["CRITICAL"]))
+            Path("trivy-reports/high-count.txt").write_text(str(counts["HIGH"]))
+            Path("trivy-reports/medium-count.txt").write_text(str(counts["MEDIUM"]))
+            PY
+                            fi
+                        '''
+                    }
                 }
             }
-        }
         
         stage('Security Gate - Evaluate Thresholds') {
             steps {
