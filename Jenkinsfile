@@ -3,7 +3,7 @@ pipeline {
     
     environment {
         TRIVY_VERSION = '0.45.0'
-        APP_NAME = 'vulnerable-python-app-sca'
+        APP_NAME = 'vulnerable-python-app'
         APP_VERSION = "${BUILD_NUMBER}"
         DOCKER_IMAGE = "${APP_NAME}:${APP_VERSION}"
         // Security thresholds
