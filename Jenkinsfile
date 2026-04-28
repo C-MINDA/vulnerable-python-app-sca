@@ -160,40 +160,40 @@ else:
                                 echo "Parsing vulnerability counts..." >> trivy-reports/trivy-summary.txt
 
                                 python3 - <<'PY'
-            import json
-            from pathlib import Path
+                                import json
+                                from pathlib import Path
 
-            report_path = Path("trivy-reports/trivy-report.json")
-            data = json.loads(report_path.read_text())
+                                report_path = Path("trivy-reports/trivy-report.json")
+                                data = json.loads(report_path.read_text())
 
-            counts = {
-                "CRITICAL": 0,
-                "HIGH": 0,
-                "MEDIUM": 0,
-                "LOW": 0,
-            }
+                                counts = {
+                                    "CRITICAL": 0,
+                                    "HIGH": 0,
+                                    "MEDIUM": 0,
+                                    "LOW": 0,
+                                }
 
-            for result in data.get("Results", []):
-                for vuln in result.get("Vulnerabilities") or []:
-                    severity = vuln.get("Severity")
-                    if severity in counts:
-                        counts[severity] += 1
+                                for result in data.get("Results", []):
+                                    for vuln in result.get("Vulnerabilities") or []:
+                                        severity = vuln.get("Severity")
+                                        if severity in counts:
+                                            counts[severity] += 1
 
-            summary_path = Path("trivy-reports/trivy-summary.txt")
-            summary_path.write_text(
-                summary_path.read_text()
-                + f"CRITICAL: {counts['CRITICAL']}\\n"
-                + f"HIGH: {counts['HIGH']}\\n"
-                + f"MEDIUM: {counts['MEDIUM']}\\n"
-                + f"LOW: {counts['LOW']}\\n"
-            )
+                                summary_path = Path("trivy-reports/trivy-summary.txt")
+                                summary_path.write_text(
+                                    summary_path.read_text()
+                                    + f"CRITICAL: {counts['CRITICAL']}\\n"
+                                    + f"HIGH: {counts['HIGH']}\\n"
+                                    + f"MEDIUM: {counts['MEDIUM']}\\n"
+                                    + f"LOW: {counts['LOW']}\\n"
+                                )
 
-            Path("trivy-reports/critical-count.txt").write_text(str(counts["CRITICAL"]))
-            Path("trivy-reports/high-count.txt").write_text(str(counts["HIGH"]))
-            Path("trivy-reports/medium-count.txt").write_text(str(counts["MEDIUM"]))
-            PY
-                            fi
-                        '''
+                                Path("trivy-reports/critical-count.txt").write_text(str(counts["CRITICAL"]))
+                                Path("trivy-reports/high-count.txt").write_text(str(counts["HIGH"]))
+                                Path("trivy-reports/medium-count.txt").write_text(str(counts["MEDIUM"]))
+                                PY
+                                fi
+                            '''
                     }
                 }
             }
