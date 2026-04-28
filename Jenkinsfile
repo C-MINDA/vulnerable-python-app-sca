@@ -154,10 +154,6 @@ else:
                         echo "Git Commit: ${GIT_COMMIT}" >> trivy-reports/trivy-summary.txt
                         echo "Git Branch: ${GIT_BRANCH}" >> trivy-reports/trivy-summary.txt
                         echo "" >> trivy-reports/trivy-summary.txt
-
-                        # --- ADD THIS LINE HERE ---
-                        # Change ownership of the reports so Jenkins can read them
-                        sudo chown -R jenkins:jenkins trivy-reports
                         
                         # Count vulnerabilities by severity
                         if [ -f trivy-reports/trivy-report.json ]; then
