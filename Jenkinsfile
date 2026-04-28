@@ -122,30 +122,24 @@ else:
                         # Run comprehensive Trivy scan
                         docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v ${WORKSPACE}/trivy-reports:/reports \
                             aquasec/trivy:${TRIVY_VERSION} image \
                             --format table \
-                            --output /reports/trivy-detailed-report.txt \
-                            ${DOCKER_IMAGE}
+                            ${DOCKER_IMAGE} > trivy-reports/trivy-detailed-report.txt
                         
                         # Generate JSON report for parsing
                         docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v ${WORKSPACE}/trivy-reports:/reports \
                             aquasec/trivy:${TRIVY_VERSION} image \
                             --format json \
-                            --output /reports/trivy-report.json \
-                            ${DOCKER_IMAGE}
+                            ${DOCKER_IMAGE} > trivy-reports/trivy-report.json
                         
                         # Generate severity-specific reports
                         docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v ${WORKSPACE}/trivy-reports:/reports \
                             aquasec/trivy:${TRIVY_VERSION} image \
                             --severity CRITICAL,HIGH \
                             --format table \
-                            --output /reports/trivy-critical-high.txt \
-                            ${DOCKER_IMAGE}
+                            ${DOCKER_IMAGE} > trivy-reports/trivy-critical-high.txt
                         
                         # Create a summary report
                         echo "=== VULNERABILITY SUMMARY ===" > trivy-reports/trivy-summary.txt
@@ -155,26 +149,29 @@ else:
                         echo "Git Branch: ${GIT_BRANCH}" >> trivy-reports/trivy-summary.txt
                         echo "" >> trivy-reports/trivy-summary.txt
                         
-                        # Count vulnerabilities by severity
-                        if [ -f trivy-reports/trivy-report.json ]; then
-                            echo "Parsing vulnerability counts..." >> trivy-reports/trivy-summary.txt
-                            
-                            # Count vulnerabilities by severity
-                            CRITICAL_COUNT=$(grep -o '"Severity":"CRITICAL"' trivy-reports/trivy-report.json | wc -l || echo "0")
-                            HIGH_COUNT=$(grep -o '"Severity":"HIGH"' trivy-reports/trivy-report.json | wc -l || echo "0")
-                            MEDIUM_COUNT=$(grep -o '"Severity":"MEDIUM"' trivy-reports/trivy-report.json | wc -l || echo "0")
-                            LOW_COUNT=$(grep -o '"Severity":"LOW"' trivy-reports/trivy-report.json | wc -l || echo "0")
-                            
-                            echo "CRITICAL: $CRITICAL_COUNT" >> trivy-reports/trivy-summary.txt
-                            echo "HIGH: $HIGH_COUNT" >> trivy-reports/trivy-summary.txt
-                            echo "MEDIUM: $MEDIUM_COUNT" >> trivy-reports/trivy-summary.txt
-                            echo "LOW: $LOW_COUNT" >> trivy-reports/trivy-summary.txt
-                            
-                            # Store counts for threshold checking
-                            echo $CRITICAL_COUNT > trivy-reports/critical-count.txt
-                            echo $HIGH_COUNT > trivy-reports/high-count.txt
-                            echo $MEDIUM_COUNT > trivy-reports/medium-count.txt
+                        # Make sure the JSON report was actually created
+                        if [ ! -f trivy-reports/trivy-report.json ]; then
+                            echo "ERROR: Trivy JSON report was not generated"
+                            exit 1
                         fi
+                        
+                        echo "Parsing vulnerability counts..." >> trivy-reports/trivy-summary.txt
+                        
+                        # Count vulnerabilities by severity
+                        CRITICAL_COUNT=$(grep -o '"Severity":[[:space:]]*"CRITICAL"' trivy-reports/trivy-report.json | wc -l || echo "0")
+                        HIGH_COUNT=$(grep -o '"Severity":[[:space:]]*"HIGH"' trivy-reports/trivy-report.json | wc -l || echo "0")
+                        MEDIUM_COUNT=$(grep -o '"Severity":[[:space:]]*"MEDIUM"' trivy-reports/trivy-report.json | wc -l || echo "0")
+                        LOW_COUNT=$(grep -o '"Severity":[[:space:]]*"LOW"' trivy-reports/trivy-report.json | wc -l || echo "0")
+                        
+                        echo "CRITICAL: $CRITICAL_COUNT" >> trivy-reports/trivy-summary.txt
+                        echo "HIGH: $HIGH_COUNT" >> trivy-reports/trivy-summary.txt
+                        echo "MEDIUM: $MEDIUM_COUNT" >> trivy-reports/trivy-summary.txt
+                        echo "LOW: $LOW_COUNT" >> trivy-reports/trivy-summary.txt
+                        
+                        # Store counts for threshold checking
+                        echo $CRITICAL_COUNT > trivy-reports/critical-count.txt
+                        echo $HIGH_COUNT > trivy-reports/high-count.txt
+                        echo $MEDIUM_COUNT > trivy-reports/medium-count.txt
                     '''
                 }
             }
